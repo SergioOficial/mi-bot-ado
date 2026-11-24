@@ -1,7 +1,7 @@
-const { sendStickerWithAudio } = require('@ado/baileys');
+const { sendStickerWithAudio, downloadMediaMessage } = require('@ado/baileys');
+const P = require('pino');
 
 module.exports = {
-    name: 'sticker-audio',
     name: 'sa',
     category: 'media',
     run: async ({ sock, msg, remitente, args, PREFIX }) => {
@@ -19,19 +19,31 @@ module.exports = {
         await sock.sendMessage(remitente, { text: '⏳ Procesando sticker con audio...' });
 
         try {
-            // Descargamos el video/audio original
-            const buffer = await sock.downloadMediaMessage({ message: quoted });
+            // 1. Construimos el objeto del mensaje citado para poder descargarlo
+            const contextInfo = msg.message.extendedTextMessage.contextInfo;
+            const mensajeParaDescargar = {
+                key: {
+                    remoteJid: remitente,
+                    id: contextInfo.stanzaId,
+                    fromMe: false // Asumimos que el video lo envió otra persona o tú mismo en el pasado
+                },
+                message: quoted
+            };
 
-            // Llamamos a la función que creaste en TU librería
+            // 2. Usamos la función oficial de Baileys para descargar el buffer
+            const buffer = await downloadMediaMessage(
+                mensajeParaDescargar, 
+                'buffer', 
+                {}, 
+                { logger: P({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
+            );
+
+            // 3. Llamamos a tu función personalizada
             await sendStickerWithAudio(sock, remitente, buffer, type === 'videoMessage');
 
         } catch (error) {
-            // Aquí atrapamos el error real
             console.error("Error en el plugin sticker-audio:", error);
-            
-            // Si el error viene de la librería, lo mostramos
-            const mensajeError = error.message || error;
-            await sock.sendMessage(remitente, { text: `❌ Error al procesar: ${mensajeError}` });
+            await sock.sendMessage(remitente, { text: `❌ Error al procesar: ${error.message || error}` });
         }
     }
 }
