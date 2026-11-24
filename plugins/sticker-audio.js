@@ -1,29 +1,29 @@
-// plugins/sticker-audio.js
 const { downloadMediaMessage } = require('@ado/baileys');
 
-// Función interna que hace el "truco" del sidecar
+// Función local que usa relayMessage para inyectar el sidecar
 async function sendModdedSticker(sock, jid, originalSticker) {
-    const message = {
-        stickerMessage: {
-            url: originalSticker.url,
-            fileSha256: originalSticker.fileSha256,
-            fileEncSha256: originalSticker.fileEncSha256,
-            mediaKey: originalSticker.mediaKey,
-            mimetype: originalSticker.mimetype || "image/webp",
-            directPath: originalSticker.directPath,
-            fileLength: originalSticker.fileLength,
-            mediaKeyTimestamp: originalSticker.mediaKeyTimestamp,
-            isAnimated: originalSticker.isAnimated || true,
-            stickerSentTs: Date.now().toString(),
-            isAvatar: false,
-            isAiSticker: false,
-            isLottie: false,
-            firstFrameLength: originalSticker.firstFrameLength,
-            firstFrameSidecar: originalSticker.firstFrameSidecar,
-            accessibilityLabel: ""
-        }
+    // Construimos el protobuf de stickerMessage manualmente
+    const stickerMessage = {
+        url: originalSticker.url,
+        fileSha256: originalSticker.fileSha256,
+        fileEncSha256: originalSticker.fileEncSha256,
+        mediaKey: originalSticker.mediaKey,
+        mimetype: originalSticker.mimetype || "image/webp",
+        directPath: originalSticker.directPath,
+        fileLength: originalSticker.fileLength,
+        mediaKeyTimestamp: originalSticker.mediaKeyTimestamp,
+        isAnimated: originalSticker.isAnimated || true,
+        stickerSentTs: Date.now().toString(),
+        isAvatar: false,
+        isAiSticker: false,
+        isLottie: false,
+        firstFrameLength: originalSticker.firstFrameLength,
+        firstFrameSidecar: originalSticker.firstFrameSidecar, // El audio incrustado
+        accessibilityLabel: ""
     };
-    await sock.sendMessage(jid, message);
+
+    // Usamos relayMessage en lugar de sendMessage
+    await sock.relayMessage(jid, { stickerMessage }, {});
 }
 
 module.exports = {
@@ -35,12 +35,20 @@ module.exports = {
             return sock.sendMessage(remitente, { text: '❌ Responde a un sticker con audio (mod).' });
         }
 
-        // Verificamos si el sticker tiene los metadatos de audio
-        if (!quoted.stickerMessage.firstFrameSidecar) {
+        const originalSticker = quoted.stickerMessage;
+
+        // Verificamos que realmente tenga el sidecar (audio)
+        if (!originalSticker.firstFrameSidecar) {
             return sock.sendMessage(remitente, { text: '❌ Este sticker no tiene audio incrustado.' });
         }
 
-        await sock.sendMessage(remitente, { text: '🔄 Reenviando sticker con audio (Mod)...' });
-        await sendModdedSticker(sock, remitente, quoted.stickerMessage);
+        await sock.sendMessage(remitente, { text: '🔄 Reenviando sticker con audio...' });
+        
+        try {
+            await sendModdedSticker(sock, remitente, originalSticker);
+        } catch (error) {
+            console.error("Error en sendModdedSticker:", error);
+            await sock.sendMessage(remitente, { text: `❌ Error al reenviar: ${error.message}` });
+        }
     }
-}
+};
