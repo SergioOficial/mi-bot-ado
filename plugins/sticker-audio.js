@@ -2,6 +2,7 @@ const { sendStickerWithAudio } = require('@ado/baileys');
 
 module.exports = {
     name: 'sticker-audio',
+    name: 'sa',
     category: 'media',
     run: async ({ sock, msg, remitente, args, PREFIX }) => {
         // Verificamos que sea una respuesta a un mensaje
@@ -25,8 +26,12 @@ module.exports = {
             await sendStickerWithAudio(sock, remitente, buffer, type === 'videoMessage');
 
         } catch (error) {
-            console.error(error);
-            await sock.sendMessage(remitente, { text: '❌ Error al procesar el sticker.' });
+            // Aquí atrapamos el error real
+            console.error("Error en el plugin sticker-audio:", error);
+            
+            // Si el error viene de la librería, lo mostramos
+            const mensajeError = error.message || error;
+            await sock.sendMessage(remitente, { text: `❌ Error al procesar: ${mensajeError}` });
         }
     }
 }
