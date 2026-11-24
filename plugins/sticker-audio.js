@@ -2,35 +2,36 @@ const { sendStickerWithAudio, downloadMediaMessage } = require('@ado/baileys');
 const P = require('pino');
 
 module.exports = {
-    name: 'sa',
+    name: 'sa', // El comando es !sa
     category: 'media',
     run: async ({ sock, msg, remitente, args, PREFIX }) => {
-        // Verificamos que sea una respuesta a un mensaje
+        // Buscamos el mensaje al que estás respondiendo
         const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        
         if (!quoted) {
-            return sock.sendMessage(remitente, { text: `Responde a un *video* con ${PREFIX}sticker-audio` });
+            return sock.sendMessage(remitente, { text: `Responde a un *video* o *nota de voz* con ${PREFIX}sa` });
         }
 
         const type = Object.keys(quoted)[0];
         if (type !== 'videoMessage' && type !== 'audioMessage') {
-            return sock.sendMessage(remitente, { text: '❌ Solo funciona con videos o notas de voz.' });
+            return sock.sendMessage(remitente, { text: '❌ Solo funciona respondiendo a un video o audio.' });
         }
 
-        await sock.sendMessage(remitente, { text: '⏳ Procesando sticker con audio...' });
+        await sock.sendMessage(remitente, { text: '⏳ Procesando, espera un momento...' });
 
         try {
-            // 1. Construimos el objeto del mensaje citado para poder descargarlo
+            // Obtenemos los datos del mensaje citado
             const contextInfo = msg.message.extendedTextMessage.contextInfo;
             const mensajeParaDescargar = {
                 key: {
                     remoteJid: remitente,
                     id: contextInfo.stanzaId,
-                    fromMe: false // Asumimos que el video lo envió otra persona o tú mismo en el pasado
+                    fromMe: false 
                 },
                 message: quoted
             };
 
-            // 2. Usamos la función oficial de Baileys para descargar el buffer
+            // Descargamos el archivo usando tu librería @ado/baileys
             const buffer = await downloadMediaMessage(
                 mensajeParaDescargar, 
                 'buffer', 
@@ -38,7 +39,7 @@ module.exports = {
                 { logger: P({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
             );
 
-            // 3. Llamamos a tu función personalizada
+            // Enviamos el sticker y el audio (usando tu función de la librería)
             await sendStickerWithAudio(sock, remitente, buffer, type === 'videoMessage');
 
         } catch (error) {
